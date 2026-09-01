@@ -55,4 +55,17 @@ public class JwtUtils {
     public int getExpirationMs() {
         return jwtExpirationMs;
     }
+    public long getRemainingValidityMs(String token) {
+        try {
+            java.util.Date expiration = Jwts.parserBuilder()
+                    .setSigningKey(key())
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody()
+                    .getExpiration();
+            return expiration.getTime() - System.currentTimeMillis();
+        } catch (Exception e) {
+            return 0;
+        }
+    }
 }

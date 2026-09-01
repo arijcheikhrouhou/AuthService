@@ -9,7 +9,12 @@ import com.cofat.auth_service.entity.User;
 import com.cofat.auth_service.repository.RoleRepository;
 import com.cofat.auth_service.repository.UserRepository;
 import com.cofat.auth_service.security.JwtUtils;
+import com.cofat.auth_service.security.RateLimitingService;
+import com.cofat.auth_service.security.TotpService;
 import com.cofat.auth_service.security.UserDetailsImpl;
+import com.cofat.auth_service.service.TokenBlacklistService;
+import io.github.bucket4j.Bucket;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -26,15 +31,11 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import com.cofat.auth_service.security.RateLimitingService;
-import io.github.bucket4j.Bucket;
-import jakarta.servlet.http.HttpServletRequest;
-@RestController
 
+@RestController
 @RequestMapping("/api/auth")
 public class AuthController {
-    @Autowired
-    private RateLimitingService rateLimitingService;
+
     @Autowired
     private AuthenticationManager authenticationManager;
 
@@ -49,6 +50,15 @@ public class AuthController {
 
     @Autowired
     private JwtUtils jwtUtils;
+
+    @Autowired
+    private RateLimitingService rateLimitingService;
+
+    @Autowired
+    private TotpService totpService;
+
+    @Autowired
+    private TokenBlacklistService tokenBlacklistService;
 
     @PostMapping("/signup")
     public ResponseEntity<?> registerUser(@Valid @RequestBody SignupRequest signUpRequest) {
@@ -91,10 +101,30 @@ public class AuthController {
                     new UsernamePasswordAuthenticationToken(
                             loginRequest.getUsername(), loginRequest.getPassword()));
 
+            UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+
+            User user = userRepository.findById(userDetails.getId())
+                    .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+            if (user.isMfaEnabled()) {
+                String code = loginRequest.getMfaCode();
+
+                if (code == null || code.isBlank()) {
+                    return ResponseEntity.status(200).body(Map.of(
+                            "mfaRequired", true,
+                            "message", "Code MFA requis."
+                    ));
+                }
+
+                boolean valid = totpService.verifyCode(user.getMfaSecret(), code);
+                if (!valid) {
+                    return ResponseEntity.status(401).body(Map.of("message", "Code MFA invalide."));
+                }
+            }
+
             SecurityContextHolder.getContext().setAuthentication(authentication);
             String jwt = jwtUtils.generateJwtToken(authentication);
 
-            UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
             List<String> roles = userDetails.getAuthorities().stream()
                     .map(GrantedAuthority::getAuthority)
                     .collect(Collectors.toList());
@@ -114,7 +144,8 @@ public class AuthController {
                             userDetails.getId(),
                             userDetails.getUsername(),
                             userDetails.getEmail(),
-                            roles));
+                            roles,
+                            user.isMfaEnabled()));
 
         } catch (org.springframework.security.authentication.DisabledException e) {
             return ResponseEntity.status(403).body(Map.of("message", "Ce compte a été désactivé. Contactez un administrateur."));
@@ -126,13 +157,28 @@ public class AuthController {
             return ResponseEntity.status(401).body(Map.of("message", "Identifiants incorrects."));
         }
     }
+
     @PostMapping("/logout")
-    public ResponseEntity<?> logoutUser() {
+    public ResponseEntity<?> logoutUser(HttpServletRequest request) {
+        String currentToken = null;
+        if (request.getCookies() != null) {
+            for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
+                if ("jwt".equals(cookie.getName())) {
+                    currentToken = cookie.getValue();
+                }
+            }
+        }
+
+        if (currentToken != null) {
+            long remaining = jwtUtils.getRemainingValidityMs(currentToken);
+            tokenBlacklistService.blacklistToken(currentToken, remaining);
+        }
+
         ResponseCookie cookie = ResponseCookie.from("jwt", "")
                 .httpOnly(true)
                 .secure(false)
                 .path("/")
-                .maxAge(0) // supprime immédiatement le cookie
+                .maxAge(0)
                 .sameSite("Lax")
                 .build();
 
@@ -149,6 +195,9 @@ public class AuthController {
 
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
 
+        User user = userRepository.findById(userDetails.getId())
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
         List<String> roles = userDetails.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.toList());
@@ -159,7 +208,8 @@ public class AuthController {
                 userDetails.getId(),
                 userDetails.getUsername(),
                 userDetails.getEmail(),
-                roles
+                roles,
+                user.isMfaEnabled()
         );
 
         return ResponseEntity.ok(response);

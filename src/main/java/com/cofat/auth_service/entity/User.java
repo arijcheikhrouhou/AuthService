@@ -16,7 +16,9 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 public class User {
+    private String mfaSecret;
 
+    private boolean mfaEnabled = false;
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

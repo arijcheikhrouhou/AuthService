@@ -7,10 +7,11 @@ import lombok.Setter;
 @Getter
 @Setter
 public class LoginRequest {
-
     @NotBlank
     private String username;
 
     @NotBlank
     private String password;
+
+    private String mfaCode; // optionnel, requis seulement si le compte a le MFA activé
 }
