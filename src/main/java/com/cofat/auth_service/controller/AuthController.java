@@ -10,6 +10,7 @@ import com.cofat.auth_service.repository.RoleRepository;
 import com.cofat.auth_service.repository.UserRepository;
 import com.cofat.auth_service.security.JwtUtils;
 import com.cofat.auth_service.security.RateLimitingService;
+import com.cofat.auth_service.security.SecurityLogger;
 import com.cofat.auth_service.security.TotpService;
 import com.cofat.auth_service.security.UserDetailsImpl;
 import com.cofat.auth_service.service.TokenBlacklistService;
@@ -60,6 +61,9 @@ public class AuthController {
     @Autowired
     private TokenBlacklistService tokenBlacklistService;
 
+    @Autowired
+    private SecurityLogger securityLogger;
+
     @PostMapping("/signup")
     public ResponseEntity<?> registerUser(@Valid @RequestBody SignupRequest signUpRequest) {
         if (userRepository.existsByUsername(signUpRequest.getUsername())) {
@@ -92,6 +96,7 @@ public class AuthController {
         Bucket bucket = rateLimitingService.resolveBucket(clientIp);
 
         if (!bucket.tryConsume(1)) {
+            securityLogger.rateLimitBlocked(clientIp);
             return ResponseEntity.status(429)
                     .body(Map.of("message", "Trop de tentatives de connexion. Réessayez dans quelques minutes."));
         }
@@ -118,6 +123,7 @@ public class AuthController {
 
                 boolean valid = totpService.verifyCode(user.getMfaSecret(), code);
                 if (!valid) {
+                    securityLogger.mfaFailed(user.getUsername(), clientIp);
                     return ResponseEntity.status(401).body(Map.of("message", "Code MFA invalide."));
                 }
             }
@@ -137,6 +143,8 @@ public class AuthController {
                     .sameSite("Lax")
                     .build();
 
+            securityLogger.loginSuccess(userDetails.getUsername(), clientIp);
+
             return ResponseEntity.ok()
                     .header(HttpHeaders.SET_COOKIE, cookie.toString())
                     .body(new JwtResponse(
@@ -148,12 +156,15 @@ public class AuthController {
                             user.isMfaEnabled()));
 
         } catch (org.springframework.security.authentication.DisabledException e) {
+            securityLogger.accountDisabledAttempt(loginRequest.getUsername(), clientIp);
             return ResponseEntity.status(403).body(Map.of("message", "Ce compte a été désactivé. Contactez un administrateur."));
 
         } catch (org.springframework.security.authentication.BadCredentialsException e) {
+            securityLogger.loginFailed(loginRequest.getUsername(), clientIp);
             return ResponseEntity.status(401).body(Map.of("message", "Identifiants incorrects."));
 
         } catch (Exception e) {
+            securityLogger.loginFailed(loginRequest.getUsername(), clientIp);
             return ResponseEntity.status(401).body(Map.of("message", "Identifiants incorrects."));
         }
     }
