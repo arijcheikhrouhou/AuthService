@@ -1,0 +1,21 @@
+<decoder name="authservice-security-log">
+  <prematch type="pcre2">^AUTHSVC </prematch>
+</decoder>
+
+<decoder name="authservice-security-log">
+  <parent>authservice-security-log</parent>
+  <regex offset="after_parent" type="pcre2">^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \| (\w+) \| username=(\S+) \| ip=(\S+) \| path=(\S+)</regex>
+  <order>timestamp, event_type, user, srcip, url</order>
+</decoder>
+
+<decoder name="authservice-security-log">
+  <parent>authservice-security-log</parent>
+  <regex offset="after_parent" type="pcre2">^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \| (\w+) \| username=(\S+) \| ip=(\S+)</regex>
+  <order>timestamp, event_type, user, srcip</order>
+</decoder>
+
+<decoder name="authservice-security-log">
+  <parent>authservice-security-log</parent>
+  <regex offset="after_parent" type="pcre2">^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \| (\w+) \| ip=(\S+)</regex>
+  <order>timestamp, event_type, srcip</order>
+</decoder>

@@ -1,0 +1,61 @@
+<group name="authservice,">
+  <rule id="100100" level="0">
+    <decoded_as>authservice-security-log</decoded_as>
+    <description>AuthService: evenement de securite generique</description>
+  </rule>
+  <rule id="100101" level="5">
+    <if_sid>100100</if_sid>
+    <field name="event_type">LOGIN_FAILED</field>
+    <description>AuthService: echec de connexion pour l'utilisateur $(dstuser)</description>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+    <group>authentication_failed,</group>
+  </rule>
+  <rule id="100102" level="3">
+    <if_sid>100100</if_sid>
+    <field name="event_type">LOGIN_SUCCESS</field>
+    <description>AuthService: connexion reussie pour l'utilisateur $(dstuser)</description>
+    <group>authentication_success,</group>
+  </rule>
+  <rule id="100103" level="10">
+    <if_sid>100100</if_sid>
+    <field name="event_type">RATE_LIMIT_BLOCKED</field>
+    <description>AuthService: blocage anti brute-force declenche</description>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+    <group>authentication_failures,</group>
+  </rule>
+  <rule id="100104" level="8">
+    <if_sid>100100</if_sid>
+    <field name="event_type">MFA_FAILED</field>
+    <description>AuthService: code MFA invalide pour l'utilisateur $(dstuser)</description>
+    <mitre>
+      <id>T1556</id>
+    </mitre>
+  </rule>
+  <rule id="100105" level="7">
+    <if_sid>100100</if_sid>
+    <field name="event_type">ACCOUNT_DISABLED_LOGIN_ATTEMPT</field>
+    <description>AuthService: tentative de connexion sur compte desactive: $(dstuser)</description>
+  </rule>
+  <rule id="100106" level="12">
+    <if_sid>100100</if_sid>
+    <field name="event_type">ADMIN_ACCESS_DENIED</field>
+    <description>AuthService: tentative d'acces admin refusee pour $(dstuser) sur $(url)</description>
+    <mitre>
+      <id>T1078</id>
+    </mitre>
+    <group>privilege_escalation,</group>
+  </rule>
+  <rule id="100107" level="10" frequency="5" timeframe="120">
+    <if_matched_sid>100101</if_matched_sid>
+    <same_source_ip />
+    <description>AuthService: multiples echecs de connexion depuis la meme IP (possible brute-force)</description>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+    <group>authentication_failures,</group>
+  </rule>
+</group>
