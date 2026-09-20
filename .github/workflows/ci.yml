@@ -52,9 +52,9 @@ jobs:
           /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'YourStrong!Passw0rd' -Q "CREATE DATABASE auth_db"
 
       - name: Build et tests Maven
-        run: >
-          mvn clean verify
-          -Dspring.datasource.url=jdbc:sqlserver://localhost:1433;databaseName=auth_db;encrypt=true;trustServerCertificate=true
-          -Dspring.datasource.username=sa
-          -Dspring.datasource.password=YourStrong!Passw0rd
-          -Dspring.jpa.hibernate.ddl-auto=create
+        env:
+          SPRING_DATASOURCE_URL: jdbc:sqlserver://localhost:1433;databaseName=auth_db;encrypt=true;trustServerCertificate=true
+          SPRING_DATASOURCE_USERNAME: sa
+          SPRING_DATASOURCE_PASSWORD: YourStrong!Passw0rd
+          SPRING_JPA_HIBERNATE_DDL-AUTO: create
+        run: mvn clean verify
