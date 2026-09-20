@@ -56,5 +56,5 @@ jobs:
           SPRING_DATASOURCE_URL: jdbc:sqlserver://localhost:1433;databaseName=auth_db;encrypt=true;trustServerCertificate=true
           SPRING_DATASOURCE_USERNAME: sa
           SPRING_DATASOURCE_PASSWORD: YourStrong!Passw0rd
-          SPRING_JPA_HIBERNATE_DDL-AUTO: create
+          SPRING_JPA_HIBERNATE_DDL_AUTO: create
         run: mvn clean verify
