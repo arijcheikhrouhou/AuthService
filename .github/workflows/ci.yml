@@ -10,6 +10,30 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: YourStrong!Passw0rd
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd="/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'YourStrong!Passw0rd' -Q 'SELECT 1'"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+      redis:
+        image: redis:latest
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
@@ -20,5 +44,14 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Créer la base auth_db
+        run: |
+          docker exec ${{ job.services.sqlserver.id }} /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'YourStrong!Passw0rd' -Q "CREATE DATABASE auth_db"
+
       - name: Build et tests Maven
-        run: mvn clean verify
+        run: >
+          mvn clean verify
+          -Dspring.datasource.url=jdbc:sqlserver://localhost:1433;databaseName=auth_db;encrypt=true;trustServerCertificate=true
+          -Dspring.datasource.username=sa
+          -Dspring.datasource.password=YourStrong!Passw0rd
+          -Dspring.jpa.hibernate.ddl-auto=create
