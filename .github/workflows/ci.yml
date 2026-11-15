@@ -57,4 +57,5 @@ jobs:
           SPRING_DATASOURCE_USERNAME: sa
           SPRING_DATASOURCE_PASSWORD: YourStrong!Passw0rd
           SPRING_JPA_HIBERNATE_DDL_AUTO: create
+          JWT_SECRET: ci-only-secret-${{ github.run_id }}-${{ github.sha }}
         run: mvn clean verify
