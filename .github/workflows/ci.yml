@@ -34,22 +34,14 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Installer sqlcmd
-        run: |
-          curl -s https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
-          curl -s https://packages.microsoft.com/config/ubuntu/22.04/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list
-          sudo apt-get update
-          sudo ACCEPT_EULA=Y apt-get install -y mssql-tools18 unixodbc-dev
-          echo "/opt/mssql-tools18/bin" >> $GITHUB_PATH
-
       - name: Attendre SQL Server et créer la base auth_db
         run: |
           for i in $(seq 1 30); do
-            /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'YourStrong!Passw0rd' -Q "SELECT 1" && break
+            docker exec ${{ job.services.sqlserver.id }} /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'YourStrong!Passw0rd' -Q "SELECT 1" && break
             echo "En attente de SQL Server..."
             sleep 3
           done
-          /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'YourStrong!Passw0rd' -Q "CREATE DATABASE auth_db"
+          docker exec ${{ job.services.sqlserver.id }} /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'YourStrong!Passw0rd' -Q "CREATE DATABASE auth_db"
 
       - name: Build et tests Maven
         env:
